@@ -4,6 +4,10 @@ import { rollModifiersForRarity } from '../types/modifiers';
 import { TECH_NODES, computeTechBonuses, calculateTechNodeCost } from '../types/techTree';
 import type { DungeonWaveInfo, DungeonWaveEnemy, DungeonClearReward, DungeonWaveResult } from '../types/dungeon';
 import { generateDungeonWaves } from '../types/dungeon';
+import type { GemType } from '../types/runewords';
+import { detectRuneword } from '../types/runewords';
+import type { AutoDisenchanterRules } from '../types/automation';
+import { DEFAULT_AUTOMATION_RULES } from '../types/automation';
 
 export type Rarity = 'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Mythic';
 
@@ -327,6 +331,9 @@ export interface GameState {
     boots: Equipment;
   };
   blessings?: string[];
+  gemInventory?: Record<GemType, number>;
+  automationRules?: AutoDisenchanterRules;
+  activeSockets?: Record<string, GemType[]>;
 }
 
 export interface MinionUnit {
@@ -583,7 +590,8 @@ export function calculatePlayerCombatStats(
   equipped: { weapon: Equipment; armor: Equipment; helmet: Equipment; gloves: Equipment; boots: Equipment },
   blessings: string[] = [],
   techTree: Record<string, number> = {},
-  extraBonusAtkPct: number = 0
+  extraBonusAtkPct: number = 0,
+  activeSockets: Record<string, GemType[]> = {}
 ): PlayerCombatStats {
   const techBonuses = computeTechBonuses(techTree);
 
@@ -623,6 +631,26 @@ export function calculatePlayerCombatStats(
   if (blessings.includes('titan_fortress')) {
     bonusHpPct += 25;
     bonusDefPct += 15;
+  }
+
+  // Calculate Elemental Gem & Runeword Awakenings
+  for (const slotKey of Object.keys(equipped) as (keyof typeof equipped)[]) {
+    const gemList = activeSockets[slotKey] || [];
+    for (const gem of gemList) {
+      if (gem === 'Ruby') burnChance += 12;
+      if (gem === 'Sapphire') dodgeRate += 10;
+      if (gem === 'Topaz') bonusAtkSpeedPct += 12;
+      if (gem === 'Amethyst') lifeSteal += 10;
+      if (gem === 'Emerald') poisonChance += 15;
+    }
+
+    const rw = detectRuneword(gemList);
+    if (rw) {
+      bonusAtkPct += rw.bonusAtkPct;
+      bonusDefPct += rw.bonusDefPct;
+      bonusHpPct += rw.bonusHpPct;
+      critRate += rw.bonusCritRate;
+    }
   }
 
   for (const mod of allMods) {
@@ -716,6 +744,9 @@ const INITIAL_STATE: GameState = {
     boots: { id: 'b0', name: 'Leather Foot-Wraps', slot: 'boots', rarity: 'Common', civilization: 'Primitive', attack: 0, defense: 2, health: 10, value: 3, modifiers: [] },
   },
   blessings: [],
+  gemInventory: { Ruby: 4, Sapphire: 3, Topaz: 3, Amethyst: 2, Emerald: 2 },
+  automationRules: DEFAULT_AUTOMATION_RULES,
+  activeSockets: { weapon: [], armor: [], helmet: [], gloves: [], boots: [] },
 };
 
 export const MULTI_FORGE_UPGRADE_COSTS: Record<number, number> = {
@@ -772,6 +803,15 @@ export function useAutoForge() {
       }
       if (typeof parsed.multiForgeLevel !== 'number') {
         parsed.multiForgeLevel = 1;
+      }
+      if (!parsed.gemInventory) {
+        parsed.gemInventory = { Ruby: 4, Sapphire: 3, Topaz: 3, Amethyst: 2, Emerald: 2 };
+      }
+      if (!parsed.automationRules) {
+        parsed.automationRules = DEFAULT_AUTOMATION_RULES;
+      }
+      if (!parsed.activeSockets) {
+        parsed.activeSockets = { weapon: [], armor: [], helmet: [], gloves: [], boots: [] };
       }
 
       const offlineSeconds = Math.min(
@@ -1969,6 +2009,93 @@ export function useAutoForge() {
     return true;
   };
 
+  // Socket a Gem into equipped item
+  const socketGem = (slot: keyof typeof state.equipped, gemType: GemType) => {
+    setState((prev) => {
+      const inv = prev.gemInventory || { Ruby: 0, Sapphire: 0, Topaz: 0, Amethyst: 0, Emerald: 0 };
+      if ((inv[gemType] || 0) < 1) return prev;
+      const currentSockets = prev.activeSockets || { weapon: [], armor: [], helmet: [], gloves: [], boots: [] };
+      const slotSockets = currentSockets[slot] || [];
+      const item = prev.equipped[slot];
+      const maxSock = item.rarity === 'Mythic' || item.rarity === 'Legendary' ? 3 : item.rarity === 'Epic' ? 2 : item.rarity === 'Rare' ? 1 : 0;
+      if (slotSockets.length >= maxSock) return prev;
+
+      const nextSockets = {
+        ...currentSockets,
+        [slot]: [...slotSockets, gemType],
+      };
+      const nextInv = {
+        ...inv,
+        [gemType]: inv[gemType] - 1,
+      };
+
+      const next: GameState = {
+        ...prev,
+        gemInventory: nextInv,
+        activeSockets: nextSockets,
+      };
+      stateRef.current = next;
+      return next;
+    });
+  };
+
+  // Unsocket Gem
+  const unsocketGem = (slot: keyof typeof state.equipped, index: number) => {
+    setState((prev) => {
+      const currentSockets = prev.activeSockets || { weapon: [], armor: [], helmet: [], gloves: [], boots: [] };
+      const slotSockets = currentSockets[slot] || [];
+      if (index < 0 || index >= slotSockets.length) return prev;
+
+      const removedGem = slotSockets[index];
+      const nextSlotSockets = slotSockets.filter((_, i) => i !== index);
+      const inv = prev.gemInventory || { Ruby: 0, Sapphire: 0, Topaz: 0, Amethyst: 0, Emerald: 0 };
+
+      const next: GameState = {
+        ...prev,
+        gemInventory: {
+          ...inv,
+          [removedGem]: (inv[removedGem] || 0) + 1,
+        },
+        activeSockets: {
+          ...currentSockets,
+          [slot]: nextSlotSockets,
+        },
+      };
+      stateRef.current = next;
+      return next;
+    });
+  };
+
+  // Fuse 3 identical gems into 1 upgraded gem
+  const fuseGems = (gemType: GemType) => {
+    setState((prev) => {
+      const inv = prev.gemInventory || { Ruby: 0, Sapphire: 0, Topaz: 0, Amethyst: 0, Emerald: 0 };
+      if ((inv[gemType] || 0) < 3) return prev;
+      const next: GameState = {
+        ...prev,
+        gemInventory: {
+          ...inv,
+          [gemType]: inv[gemType] - 2,
+        },
+      };
+      stateRef.current = next;
+      return next;
+    });
+  };
+
+  // Update automation rules
+  const updateAutomationRules = (updated: Partial<AutoDisenchanterRules>) => {
+    setState((prev) => {
+      const current = prev.automationRules || DEFAULT_AUTOMATION_RULES;
+      const next: GameState = {
+        ...prev,
+        automationRules: { ...current, ...updated },
+      };
+      stateRef.current = next;
+      return next;
+    });
+  };
+
   return {
     state,
     forgeItem,
@@ -1991,5 +2118,9 @@ export function useAutoForge() {
     startDungeonExpedition,
     fightDungeonWave,
     claimDungeonRewards,
+    socketGem,
+    unsocketGem,
+    fuseGems,
+    updateAutomationRules,
   };
 }

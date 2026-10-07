@@ -14,12 +14,17 @@ import {
   Zap,
   Layers,
   Lock,
+  Cpu,
+  Sparkles,
 } from 'lucide-react';
 import { RARITY_CONFIGS } from './RarityTheme';
 import { ForgeUpgradeModal } from './ForgeUpgradeModal';
 import { ItemComparisonModal } from './ItemComparisonModal';
 import type { ComparisonPair } from './ItemComparisonModal';
 import { GearItemVisual } from './GearVisuals';
+import { ForgeEmberCanvas } from './ForgeEmberCanvas';
+import { ConveyorPipeline } from './ConveyorPipeline';
+import type { AutoDisenchanterRules } from '../types/automation';
 
 interface Spark {
   id: number;
@@ -41,6 +46,8 @@ interface ForgeWorkshopProps {
   onUpgrade: () => void;
   getUpgradeCost: (level: number) => { gold: number; scrap: number };
   onOpenShop?: () => void;
+  onOpenRuneword?: () => void;
+  onChangeAutomationRules?: (updated: Partial<AutoDisenchanterRules>) => void;
 }
 
 export const ForgeWorkshop: React.FC<ForgeWorkshopProps> = ({
@@ -54,6 +61,8 @@ export const ForgeWorkshop: React.FC<ForgeWorkshopProps> = ({
   onUpgrade,
   getUpgradeCost,
   onOpenShop,
+  onOpenRuneword,
+  onChangeAutomationRules,
 }) => {
   const [isStriking, setIsStriking] = useState(false);
   const [isAutoForging, setIsAutoForging] = useState(false);
@@ -63,6 +72,8 @@ export const ForgeWorkshop: React.FC<ForgeWorkshopProps> = ({
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [forgedChoicePairs, setForgedChoicePairs] = useState<ComparisonPair[] | null>(null);
   const [batchSize, setBatchSize] = useState(1);
+  const [showPipeline, setShowPipeline] = useState(false);
+  const [sparkTriggerCount, setSparkTriggerCount] = useState(0);
 
   const maxBatch = Math.max(1, Math.min(5, state.multiForgeLevel || 1));
   const activeBatch = Math.min(batchSize, maxBatch);
@@ -90,6 +101,7 @@ export const ForgeWorkshop: React.FC<ForgeWorkshopProps> = ({
   const triggerSparkAnimation = (count = 1, rarity?: string) => {
     setIsStriking(true);
     soundFx.playHammer(rarity);
+    setSparkTriggerCount((c) => c + 1);
 
     const sparkCount = Math.min(30, 8 + count * 4);
     const newSparks: Spark[] = Array.from({ length: sparkCount }).map((_, i) => ({
@@ -264,6 +276,32 @@ export const ForgeWorkshop: React.FC<ForgeWorkshopProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Pipeline Engine Toggle */}
+              <button
+                onClick={() => setShowPipeline((prev) => !prev)}
+                className={`px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border ${
+                  showPipeline
+                    ? 'bg-purple-950/80 border-purple-500/50 text-purple-300'
+                    : 'bg-zinc-800/80 border-zinc-700 text-zinc-300 hover:border-zinc-600'
+                }`}
+                title="Toggle Automated Conveyor & Disenchanter Pipeline"
+              >
+                <Cpu className="w-3.5 h-3.5 text-purple-400" />
+                <span>Pipeline</span>
+              </button>
+
+              {/* Runeword Forge Button */}
+              {onOpenRuneword && (
+                <button
+                  onClick={onOpenRuneword}
+                  className="px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border bg-amber-950/80 border-amber-500/50 text-amber-300 hover:border-amber-400 shadow-sm"
+                  title="Open Runeword Matrix & Gem Socketing"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  <span>Runewords</span>
+                </button>
+              )}
+
               {/* Auto-Equip Toggle */}
               <button
                 onClick={onToggleAutoEquip}
@@ -297,8 +335,33 @@ export const ForgeWorkshop: React.FC<ForgeWorkshopProps> = ({
             </div>
           </div>
 
+          {/* Optional Collapsible Conveyor Pipeline */}
+          {showPipeline && (
+            <div className="mb-3 animate-fade-in">
+              <ConveyorPipeline
+                autoEquip={state.autoEquip}
+                onToggleAutoEquip={onToggleAutoEquip}
+                automationRules={state.automationRules || {
+                  autoScrapCommon: true,
+                  autoScrapRare: false,
+                  autoScrapEpic: false,
+                  autoScrapIfStatLower: false,
+                  autoFuseIdentical: true,
+                  conveyorSpeedLevel: 1,
+                }}
+                onChangeRules={(updated) => onChangeAutomationRules?.(updated)}
+              />
+            </div>
+          )}
+
           {/* Forge & Anvil Visual Display Stage */}
           <div className="relative w-full h-44 sm:h-48 bg-gradient-to-b from-stone-950 via-zinc-900 to-black rounded-xl border border-zinc-800/90 flex flex-col items-center justify-center overflow-hidden mb-3 select-none shadow-2xl">
+            {/* Interactive Particle & Ember Canvas */}
+            <ForgeEmberCanvas
+              isForging={isStriking || isAutoForging}
+              activeRarity={lastForged?.item?.rarity}
+              triggerSparkCount={sparkTriggerCount}
+            />
             {/* Stone Furnace Arch & Hearth Silhouette */}
             <div className="absolute inset-0 pointer-events-none">
               {/* Brick masonry subtle pattern */}

@@ -9,6 +9,7 @@ interface GameHeaderProps {
   onOpenShop?: () => void;
   onOpenDungeon?: () => void;
   onOpenTechTree?: () => void;
+  onOpenRuneword?: () => void;
 }
 
 export const GameHeader: React.FC<GameHeaderProps> = ({
@@ -17,6 +18,7 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
   onOpenShop,
   onOpenDungeon,
   onOpenTechTree,
+  onOpenRuneword,
 }) => {
   const [soundEnabled, setSoundEnabled] = useState(true);
 
@@ -74,6 +76,20 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
               <span className="font-extrabold">{state.techCores}</span>
               <span className="bg-purple-500/20 text-purple-300 text-[10px] uppercase font-black px-1.5 py-0.5 rounded border border-purple-500/40">
                 Tech
+              </span>
+            </button>
+          )}
+
+          {/* Runewords Button */}
+          {onOpenRuneword && (
+            <button
+              onClick={onOpenRuneword}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-amber-950/90 via-orange-950/80 to-amber-950/90 hover:from-amber-900 hover:to-orange-900 border border-amber-500/50 hover:border-amber-400 px-3 py-1.5 rounded-xl text-xs font-black text-amber-300 transition cursor-pointer shadow-lg shadow-amber-950/50 active:scale-95 group"
+              title="Open Elemental Runeword Matrix"
+            >
+              <Sparkles className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform animate-pulse" />
+              <span className="bg-amber-500/20 text-amber-300 text-[10px] uppercase font-black px-1.5 py-0.5 rounded border border-amber-500/40">
+                Runewords
               </span>
             </button>
           )}

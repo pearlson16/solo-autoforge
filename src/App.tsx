@@ -9,6 +9,7 @@ import { RubyShopModal } from './components/RubyShopModal';
 import { DungeonModal } from './components/DungeonModal';
 import { TechTreeModal } from './components/TechTreeModal';
 import { ItemComparisonModal } from './components/ItemComparisonModal';
+import { RunewordSocketModal } from './components/RunewordSocketModal';
 import { soundFx } from './utils/audio';
 
 export default function App() {
@@ -34,11 +35,16 @@ export default function App() {
     startDungeonExpedition,
     fightDungeonWave,
     claimDungeonRewards,
+    socketGem,
+    unsocketGem,
+    fuseGems,
+    updateAutomationRules,
   } = useAutoForge();
 
   const [isShopOpen, setIsShopOpen] = useState(false);
   const [isDungeonOpen, setIsDungeonOpen] = useState(false);
   const [isTechTreeOpen, setIsTechTreeOpen] = useState(false);
+  const [isRunewordOpen, setIsRunewordOpen] = useState(false);
   const [shopComparisonItem, setShopComparisonItem] = useState<{ newItem: Equipment; equippedItem: Equipment } | null>(null);
 
   return (
@@ -64,6 +70,7 @@ export default function App() {
         onOpenShop={() => setIsShopOpen(true)}
         onOpenDungeon={() => setIsDungeonOpen(true)}
         onOpenTechTree={() => setIsTechTreeOpen(true)}
+        onOpenRuneword={() => setIsRunewordOpen(true)}
       />
 
       {/* Main Game Interface */}
@@ -84,6 +91,8 @@ export default function App() {
             onUpgrade={upgradeForge}
             getUpgradeCost={getUpgradeCost}
             onOpenShop={() => setIsShopOpen(true)}
+            onOpenRuneword={() => setIsRunewordOpen(true)}
+            onChangeAutomationRules={updateAutomationRules}
           />
         </div>
 
@@ -130,6 +139,18 @@ export default function App() {
         onUpgradeNode={upgradeTechNode}
         onRespecTree={respecTechTree}
         onOpenDungeon={() => setIsDungeonOpen(true)}
+      />
+
+      {/* Elemental Runeword & Gem Socketing Modal */}
+      <RunewordSocketModal
+        isOpen={isRunewordOpen}
+        onClose={() => setIsRunewordOpen(false)}
+        equipped={state.equipped}
+        gemInventory={state.gemInventory || { Ruby: 0, Sapphire: 0, Topaz: 0, Amethyst: 0, Emerald: 0 }}
+        onSocketGem={socketGem}
+        onUnsocketGem={unsocketGem}
+        onFuseGems={fuseGems}
+        activeSockets={state.activeSockets || { weapon: [], armor: [], helmet: [], gloves: [], boots: [] }}
       />
 
       {/* Item Comparison Modal for Manual Chest Loot */}

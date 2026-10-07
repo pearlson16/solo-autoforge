@@ -13,7 +13,7 @@ interface HeroDisplayProps {
 
 export const HeroDisplay: React.FC<HeroDisplayProps> = ({ state }) => {
   const [inspectItem, setInspectItem] = useState<Equipment | null>(null);
-  const stats = calculatePlayerCombatStats(state.equipped, state.blessings || [], state.techTree || {});
+  const stats = calculatePlayerCombatStats(state.equipped, state.blessings || [], state.techTree || {}, 0, state.activeSockets || {});
 
   // Calculate Power Score & Civilization Synergies
   const powerScore = calculateHeroPower(stats);
